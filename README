@@ -1,0 +1,8 @@
+Usage:
+whoville_scraper __URL__ __{userId|"all"}__
+
+Purpose:
+- will store anonymous profile in Mongo db
+
+NOTE:
+- intended to be run by cron at a certain time of day
