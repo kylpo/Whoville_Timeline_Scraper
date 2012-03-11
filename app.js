@@ -1,7 +1,14 @@
+//for flatiron
 var flatiron = require('flatiron'),
     path = require('path'),
     request = require('request'),
     app = flatiron.app;
+//for mongo
+var mongodb = require('mongodb'),
+    mongoServer = new mongodb.Server("127.0.0.1", 27017, {}),
+    util = require('util');
+
+//------------- Flatiron Setup ----------------//
 
 app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
 
@@ -17,8 +24,33 @@ app.use(flatiron.plugins.cli, {
   ]
 });
 
-app.scrape_id = function (url, id) {
+//--------------- Custom Methods -------------//
 
+app.persist_profile = function (url, ids) {
+  //setup Mongo connection
+  var connection = new mongodb.Db('test', mongoServer, {});
+
+  connection.open(function (error, client) {
+    if (error) throw error;
+    var collection = new mongodb.Collection(client, 'whoville_timeline');
+    ids.forEach( function(id){
+      app.scrape_id( url, id, function(profile_text) {
+
+        // generate object from json return
+        // and add an ID and Date field for the web's use
+        var profile = JSON.parse( profile_text);
+        profile.id = id;
+        profile.date = Date();
+
+        app.log.info("storing profile:\n" + util.inspect(profile));
+        collection.insert( profile );
+      });
+    });
+    // connection.close();
+  });
+};
+
+app.scrape_id = function (url, id, callback) {
   // prepend w/ http and add the /users/ because
   // command line doesn't like /'s in an argument
   var route = "http://" + url + "/users/" + id;
@@ -28,7 +60,7 @@ app.scrape_id = function (url, id) {
   request( route, function (error, response, body ) {
     if (!error && response.statusCode == 200) {
       if (body !== 'null'){
-        console.log(body);
+        callback( body );
       } else {
         app.log.error("Null response using route: " + route);
       }
@@ -38,20 +70,23 @@ app.scrape_id = function (url, id) {
   });
 };
 
+//-----------CLI Commands------------------//
+
 app.cmd(':url all', function(url, id) {
   var route = "http://" + url + "/users/";
 
   app.log.info( "scraping " + route );
 
-  request( route, function (error, response, body ) {
+  // send request to route. body is content of response.
+  request( route, function (error, response, body) {
     if (!error && response.statusCode == 200) {
+
       app.log.info("server response: " + body);
 
-      //remove ending ',' and delemit by ','
+      // remove ending ',' and delemit by ','
       var ids = body.substring(0, body.length-1).split(',');
-      for(i in ids){
-        app.scrape_id( url, ids[i] );
-      }
+
+      app.persist_profile( url, ids );
     } else {
       app.log.error("Error using route: " + route);
     }
@@ -59,7 +94,12 @@ app.cmd(':url all', function(url, id) {
 });
 
 app.cmd(':url :id', function(url, id) {
-  app.scrape_id( url, id );
+  var ids = [];
+  ids.push( id );
+
+  app.persist_profile( url, ids );
 });
+
+//-----------------------------------------//
 
 app.start();
