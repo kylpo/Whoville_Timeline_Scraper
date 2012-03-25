@@ -1,5 +1,7 @@
 Usage:
 whoville_scraper __URL__ __{userId|"all"}__
+e.g. ->
+  node app.js ec2-107-20-124-111.compute-1.amazonaws.com all
 
 Purpose:
 - will store anonymous profile in Mongo db

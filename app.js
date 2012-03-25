@@ -30,9 +30,11 @@ app.persist_profile = function (url, ids) {
   //setup Mongo connection
   var connection = new mongodb.Db('test', mongoServer, {});
 
-  connection.open(function (error, client) {
+  connection.open( function (error, client) {
     if (error) throw error;
     var collection = new mongodb.Collection(client, 'whoville_timeline');
+
+    var insertsPending = ids.length;
     ids.forEach( function(id){
       app.scrape_id( url, id, function(profile_text) {
 
@@ -43,10 +45,18 @@ app.persist_profile = function (url, ids) {
         profile.date = Date();
 
         app.log.info("storing profile:\n" + util.inspect(profile));
-        collection.insert( profile );
+
+        var insertedDoc = function(){
+          insertsPending--;
+
+          if (insertsPending === 0){
+            connection.close();
+          }
+        };
+
+        collection.insert( profile, insertedDoc );
       });
     });
-    // connection.close();
   });
 };
 
