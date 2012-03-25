@@ -7,6 +7,7 @@ var flatiron = require('flatiron'),
 var mongodb = require('mongodb'),
     mongoServer = new mongodb.Server("127.0.0.1", 27017, {}),
     util = require('util');
+    async = require('async');
 
 //------------- Flatiron Setup ----------------//
 
@@ -34,8 +35,7 @@ app.persist_profile = function (url, ids) {
     if (error) throw error;
     var collection = new mongodb.Collection(client, 'whoville_timeline');
 
-    var insertsPending = ids.length;
-    ids.forEach( function(id){
+    async.forEach( ids, function( id, callback ) {
       app.scrape_id( url, id, function(profile_text) {
 
         // generate object from json return
@@ -46,17 +46,14 @@ app.persist_profile = function (url, ids) {
 
         app.log.info("storing profile:\n" + util.inspect(profile));
 
-        var insertedDoc = function(){
-          insertsPending--;
+        collection.insert( profile );
 
-          if (insertsPending === 0){
-            connection.close();
-          }
-        };
-
-        collection.insert( profile, insertedDoc );
+        callback(); //for end of async.forEach
       });
+    }, function(err){
+      connection.close();
     });
+
   });
 };
 
